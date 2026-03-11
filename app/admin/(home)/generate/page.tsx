@@ -1,291 +1,260 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
-import { useVirtualizer } from "@tanstack/react-virtual"
+import { useEffect, useState, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Loader2, ArrowLeft, Download} from "lucide-react";
+import QRCode from "qrcode";
 
-import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+export default function GenerateFlyerPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-import { Search } from "lucide-react"
-import { apiRequest } from "@/lib/apiRequest"
-
-export default function HomePage() {
-
-  const router = useRouter()
-
-  const [search, setSearch] = useState("")
-  const [results, setResults] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [active, setActive] = useState(-1)
-
-  const parentRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef("")
-
-  const showDropdown = search.trim().length >= 3
-
-  /* ================= SEARCH TYPE ================= */
-
-  const getPayload = (value: string) => {
-
-    if (/^\d+$/.test(value)) return { mobile: value }
-
-    if (/^[A-Za-z0-9]+$/.test(value) && value.length >= 6)
-      return { regNum: value.toUpperCase() }
-
-    return { name: value }
-
-  }
-
-  /* ================= HIGHLIGHT ================= */
-
-  const highlight = (text: string) => {
-
-    if (!search) return text
-
-    const regex = new RegExp(`(${search})`, "gi")
-
-    return text.split(regex).map((part, i) =>
-      regex.test(part)
-        ? <span key={i} className="bg-yellow-200 font-semibold">{part}</span>
-        : part
-    )
-
-  }
-
-  /* ================= DEBOUNCED SEARCH ================= */
+  const [loading, setLoading] = useState(true);
+  const [qrCodeData, setQrCodeData] = useState("");
+  const [name, setName] = useState("");
+  const [frameImage, setFrameImage] = useState<HTMLImageElement | null>(null);
+  const [qrImage, setQrImage] = useState<string>("");
+  const [compositeImage, setCompositeImage] = useState<string>("");
+  const computedFont = getComputedStyle(document.body).fontFamily;
 
   useEffect(() => {
+    const init = async () => {
+      const code = searchParams.get("code");
+      const personName = searchParams.get("name");
 
-    const value = search.trim()
-
-    if (value.length < 3) {
-      setResults([])
-      setActive(-1)
-      return
-    }
-
-    searchRef.current = value
-
-    const timer = setTimeout(async () => {
-
-      try {
-
-        setLoading(true)
-        setError("")
-
-        const res = await apiRequest({
-          endpoint: "/api/registers/search",
-          method: "POST",
-          body: getPayload(value)
-        })
-
-        /* ignore stale responses */
-        if (searchRef.current !== value) return
-
-        setResults(res?.data || [])
-        setActive(-1)
-
-      } catch (err: any) {
-
-        setError(err.message || "Search failed")
-
-      } finally {
-
-        setLoading(false)
-
+      if (!code || !personName) {
+        router.push("/admin/dashboard");
+        return;
       }
 
-    }, 300)
+      setQrCodeData(code);
+      setName(decodeURIComponent(personName));
 
-    return () => clearTimeout(timer)
+      // 🔥 Ensure Cinzel font is loaded before drawing
+      await document.fonts.load('bold 40px "Cinzel"');
 
-  }, [search])
+      await Promise.all([loadFrameImage(), generateQRCode(code)]);
+      setLoading(false);
+    };
 
-  /* ================= KEYBOARD NAVIGATION ================= */
+    init();
+  }, [searchParams, router]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const loadFrameImage = (): Promise<void> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.src = "/frame.jpeg"; // Make sure this matches your filename
+      img.onload = () => {
+        setFrameImage(img);
+        resolve();
+      };
+    });
+  };
 
-    if (!results.length) return
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault()
-      setActive(v => Math.min(v + 1, results.length - 1))
+  const generateQRCode = async (data: string): Promise<void> => {
+    try {
+      const qrDataURL = await QRCode.toDataURL(data, {
+        width: 200,
+        margin: 1,
+        color: {
+          dark: "#000000",
+          light: "#FFFFFF",
+        },
+      });
+      setQrImage(qrDataURL);
+    } catch (err) {
+      console.error("QR generation failed:", err);
     }
+  };
 
-    if (e.key === "ArrowUp") {
-      e.preventDefault()
-      setActive(v => Math.max(v - 1, 0))
+  // Create composite image when all assets are loaded
+  useEffect(() => {
+    if (!loading && frameImage && qrImage && canvasRef.current) {
+      createCompositeImage();
     }
+  }, [loading, frameImage, qrImage]);
 
-    if (e.key === "Enter" && active >= 0) {
+  const createCompositeImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !frameImage || !qrImage) return;
 
-      const r = results[active]
+    // Set canvas dimensions to match frame
+    canvas.width = frameImage.width;
+    canvas.height = frameImage.height;
 
-      router.push(`/admin/generate?code=${r.regNum}&name=${encodeURIComponent(r.name)}`)
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
+    // Draw frame first
+    ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
+
+    // Draw name
+    ctx.font = `bold 50px ${computedFont}`;
+    ctx.fillStyle = "#504943";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // Position name - adjust these coordinates based on your frame
+    const nameX = canvas.width / 2; // Center horizontally
+    const nameY = canvas.height * 0.54; // 47% from top (adjust as needed)
+
+    ctx.fillText(name.toUpperCase(), nameX, nameY);
+
+    // Load and draw QR code
+    const qrImg = new window.Image();
+    qrImg.crossOrigin = "anonymous";
+    qrImg.onload = () => {
+      // Position QR - adjust these coordinates based on your frame
+      const qrSize = 285; // Size of QR code
+      const qrX = (canvas.width - qrSize) / 2; // Center horizontally
+      const qrY = canvas.height * 0.59; // 60% from top (adjust as needed)
+
+      // Draw white background for QR
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10);
+
+      // Draw QR code
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+      // Convert canvas to data URL
+      setCompositeImage(canvas.toDataURL("image/png"));
+    };
+    qrImg.src = qrImage;
+  };
+
+  const handleDownload = () => {
+    if (!compositeImage) return;
+
+    const link = document.createElement("a");
+    link.download = `wedding-${name.replace(/\s+/g, "_")}-${qrCodeData}.png`;
+    link.href = compositeImage;
+    link.click();
+  };
+
+  const handlePrint = () => {
+    if (!compositeImage) return;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Wedding Flyer - ${name}</title>
+            <style>
+              body {
+                margin: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                background: white;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+              }
+              @media print {
+                body { background: white; }
+                img { box-shadow: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${compositeImage}" />
+            <script>
+              window.onload = () => {
+                setTimeout(() => {
+                  window.print();
+                }, 500);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
     }
+  };
 
-    if (e.key === "Escape") {
-      setResults([])
-      setSearch("")
-    }
-
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-amber-600 mx-auto mb-4" />
+          <p className="text-gray-600 font-cinzel">Creating your flyer...</p>
+        </div>
+      </div>
+    );
   }
 
-  /* ================= VIRTUAL LIST ================= */
-
-  const rowVirtualizer = useVirtualizer({
-    count: results.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 70
-  })
-
-  const items = rowVirtualizer.getVirtualItems()
-
-  /* ================= UI ================= */
-
   return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 p-4">
+      <div className="max-w-4xl mx-auto py-8">
+        {/* Hidden canvas for image processing */}
+        <canvas ref={canvasRef} style={{ display: "none" }} />
 
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 p-4">
-
-      <div className="max-w-4xl mx-auto pt-16 flex-1 w-full">
-
-        {/* SEARCH INPUT */}
-
-        <div className="relative">
-
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Search name / mobile / reg number"
-            className="pl-12 h-14 text-lg border-2 border-amber-200 focus:border-amber-400"
-          />
-
-          <Search className="absolute left-4 top-4 h-6 w-6 text-amber-400" />
-
+        {/* Navigation */}
+        <div className="flex justify-between items-center mb-6">
+          <Button variant="ghost" onClick={() => router.push("/admin/dashboard")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Search
+          </Button>
         </div>
 
-        {/* HELP TEXT */}
+        {/* Main Content */}
+        <Card className="p-6 md:p-8 bg-white/95 backdrop-blur shadow-2xl">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#504943] mb-2 font-cinzel">
+              Your Wedding Invitation
+            </h2>
+            <p className="text-gray-500 font-cinzel text-lg">{name}</p>
+          </div>
 
-        {search.length > 0 && search.length < 3 && (
-          <p className="text-sm text-gray-500 mt-3">
-            Type at least 3 characters to search
-          </p>
-        )}
-
-        {/* BLUR OVERLAY */}
-
-        {showDropdown && (
-          <div
-            className="fixed inset-0 backdrop-blur-sm bg-black/10 z-10"
-            onClick={() => setSearch("")}
-          />
-        )}
-
-        {/* DROPDOWN RESULTS */}
-
-        {showDropdown && (
-
-          <Card className="absolute mt-2 w-full z-20 shadow-xl">
-
-            <div ref={parentRef} className="max-h-[400px] overflow-auto">
-
-              <div
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  position: "relative"
-                }}
-              >
-
-                {items.map(vRow => {
-
-                  const item = results[vRow.index]
-                  const isActive = vRow.index === active
-
-                  return (
-
-                    <div
-                      key={item._id || vRow.index}
-                      className={`absolute w-full px-4 py-3 cursor-pointer border-b
-                      ${isActive ? "bg-orange-100" : "hover:bg-orange-50"}`}
-                      style={{
-                        transform: `translateY(${vRow.start}px)`
-                      }}
-                      onMouseEnter={() => setActive(vRow.index)}
-                      onClick={() =>
-                        router.push(`/admin/generate?code=${item.regNum}&name=${encodeURIComponent(item.name)}`)
-                      }
-                    >
-
-                      <div className="font-semibold text-[#504943]">
-                        {highlight(item.name)}
-                      </div>
-
-                      <div className="text-sm text-gray-500">
-                        Mobile: {highlight(item.mobile)}
-                      </div>
-
-                      <div className="text-xs text-gray-400">
-                        Reg#: {highlight(item.regNum)}
-                      </div>
-
-                    </div>
-
-                  )
-
-                })}
-
-                {loading && (
-                  <div className="p-4 text-center text-gray-500">
-                    Searching...
-                  </div>
-                )}
-
-                {!loading && results.length === 0 && (
-                  <div className="p-4 text-center text-gray-500">
-                    No records found
-                  </div>
-                )}
-
+          {/* Composite Image Preview */}
+          {compositeImage && (
+            <div className="mb-8 flex justify-center">
+              <div className="relative rounded-xl shadow-2xl overflow-hidden max-w-2xl">
+                <img
+                  src={compositeImage}
+                  alt={`Wedding flyer for ${name}`}
+                  className="w-full h-auto"
+                />
               </div>
-
             </div>
+          )}
 
-          </Card>
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-6">
+            <Button
+              onClick={handleDownload}
+              className="bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-700 hover:to-red-700 h-12 px-8 text-lg font-cinzel"
+            >
+              <Download className="mr-2 h-5 w-5" />
+              Download Flyer
+            </Button>
 
-        )}
+            <Button
+              onClick={handlePrint}
+              variant="outline"
+              className="h-12 px-8 text-lg border-2 border-amber-600 text-amber-700 hover:bg-amber-50 font-cinzel"
+            >
+              🖨️ Print Flyer
+            </Button>
+          </div>
 
-        {/* ERROR */}
-
-        {error && (
-          <Alert className="mt-4" variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
+          {/* QR Code Info */}
+          <div className="text-center space-y-2">
+            <p className="text-sm text-gray-500 bg-amber-50 inline-block px-4 py-2 rounded-full">
+              <span className="font-semibold">QR Code contains:</span>{" "}
+              {qrCodeData}
+            </p>
+          </div>
+        </Card>
       </div>
-
-      {/* FOOTER */}
-
-      <footer className="mt-auto border-t bg-white/60 backdrop-blur">
-
-        <div className="mx-auto max-w-7xl px-4 py-4 text-center text-sm text-gray-600">
-
-          © {new Date().getFullYear()} All Rights Reserved. Powered by
-          <span className="font-semibold text-orange-700">
-            {" "}SaaScraft Studio (India) Pvt. Ltd.
-          </span>
-
-        </div>
-
-      </footer>
-
     </div>
-
-  )
-
+  );
 }
