@@ -26,8 +26,8 @@ const cinzel = Cinzel({
 /* ================= METADATA ================= */
 
 export const metadata: Metadata = {
-  title: "Event Invitation System",
-  description: "Invitation & Badge Printing System",
+  title: "QR Scanning and Invitation Management System",
+  description: "A web application for managing wedding invitations and QR code scanning.",
 };
 
 /* ================= ROOT LAYOUT ================= */

@@ -59,7 +59,7 @@ export default function GenerateFlyerPage() {
     try {
       const qrDataURL = await QRCode.toDataURL(data, {
         width: 200,
-        margin: 1,
+        margin: 2,
         color: {
           dark: "#000000",
           light: "#FFFFFF",
@@ -93,7 +93,7 @@ export default function GenerateFlyerPage() {
     ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
 
     // Draw name
-    ctx.font = `bold 50px ${computedFont}`;
+    ctx.font = `bold 20px ${computedFont}`;
     ctx.fillStyle = "#504943";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -109,9 +109,9 @@ export default function GenerateFlyerPage() {
     qrImg.crossOrigin = "anonymous";
     qrImg.onload = () => {
       // Position QR - adjust these coordinates based on your frame
-      const qrSize = 210; // Size of QR code
+      const qrSize = 100; // Size of QR code
       const qrX = (canvas.width - qrSize) / 2; // Center horizontally
-      const qrY = canvas.height * 0.71; // 60% from top (adjust as needed)
+      const qrY = canvas.height * 0.61; // 60% from top (adjust as needed)
 
       // Draw white background for QR
       ctx.fillStyle = "#FFFFFF";
@@ -130,7 +130,7 @@ export default function GenerateFlyerPage() {
     if (!compositeImage) return;
 
     const link = document.createElement("a");
-    link.download = `wedding-${name.replace(/\s+/g, "_")}-${qrCodeData}.png`;
+    link.download = `${name.replace(/\s+/g, '_')}-wedding-invitation.png`;
     link.href = compositeImage;
     link.click();
   };
