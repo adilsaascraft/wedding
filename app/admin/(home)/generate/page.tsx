@@ -199,7 +199,7 @@ export default function GenerateFlyerPage() {
 
         {/* Navigation */}
         <div className="flex justify-between items-center mb-6">
-          <Button variant="ghost" onClick={() => router.push("/admin/dashboard")}>
+          <Button variant="ghost" onClick={() => router.push("/admin/search")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Search
           </Button>
