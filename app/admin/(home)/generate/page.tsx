@@ -109,7 +109,7 @@ export default function GenerateFlyerPage() {
     qrImg.crossOrigin = "anonymous";
     qrImg.onload = () => {
       // Position QR - adjust these coordinates based on your frame
-      const qrSize = 100; // Size of QR code
+      const qrSize = 104; // Size of QR code
       const qrX = (canvas.width - qrSize) / 2; // Center horizontally
       const qrY = canvas.height * 0.61; // 60% from top (adjust as needed)
 

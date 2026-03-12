@@ -16,7 +16,7 @@ import {
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-import { Search} from "lucide-react";
+import { Search } from "lucide-react";
 
 import { apiRequest } from "@/lib/apiRequest";
 
@@ -36,8 +36,37 @@ export default function HomePage() {
 
  /*================ Generate Qr Code ===========*/
 
+ const handleGenerateSingle = async (
+  regNum: string,
+  name: string,
+  id?: string,
+  isReprint?: boolean
+ ) => {
 
- const handleGenerateSingle = async (regNum: string, name: string) => {
+  try {
+
+   /* call PATCH API only for first print */
+
+   if (!isReprint && id) {
+
+    await apiRequest({
+     endpoint: `/api/registers/${id}/print`,
+     method: "PATCH",
+    })
+
+    /* update UI instantly */
+
+    setResults((prev) =>
+     prev.map((r) =>
+      r._id === id ? { ...r, isPrinted: true } : r
+     )
+    )
+
+   }
+
+  } catch (err) {
+   console.error("Print API failed", err)
+  }
 
   const qr = await QRCode.toDataURL(regNum);
 
@@ -69,7 +98,7 @@ export default function HomePage() {
           }
 
           .banner{
-            height:40%;
+            height:50%;
             background-image:url('/badge-banner.png');
             background-size:cover;
             background-position:center;
@@ -77,7 +106,7 @@ export default function HomePage() {
 
           .name{
             text-align:center;
-            font-size:28px;
+            font-size:20px;
             font-weight:bold;
             padding:20px 10px;
           }
@@ -257,12 +286,12 @@ export default function HomePage() {
 
     <div className="text-center mb-10">
 
-     <h1 className="text-5xl font-bold text-[#504943] mb-4 font-cinzel">
-      Wedding Invitation
+     <h1 className="text-3xl font-bold text-[#504943] mb-4 font-cinzel">
+      Badge Printing
      </h1>
 
      <p className="text-xl text-gray-600 font-cinzel">
-      Generate your personalized flyer
+      Print Guest Badges
      </p>
 
     </div>
@@ -366,14 +395,40 @@ ${active ? "ring-2 ring-orange-500" : "hover:shadow-lg"}`}
 
              </div>
 
-             <Button
-              onClick={() => handleGenerateSingle(item.regNum, item.name)}
-              className="bg-gradient-to-r from-amber-600 to-red-600 h-12 px-6"
-             >
+             <div className="flex flex-col gap-2">
 
-              Print Badge
+              <Button
+               disabled={item.isPrinted}
+               onClick={() =>
+                handleGenerateSingle(
+                 item.regNum,
+                 item.name,
+                 item._id,
+                 false
+                )
+               }
+               className="bg-gradient-to-r from-amber-600 to-red-600 h-12 px-6"
+              >
+               {item.isPrinted ? "Printed" : "Print Badge"}
+              </Button>
 
-             </Button>
+              {item.isPrinted && (
+               <Button
+                variant="outline"
+                onClick={() =>
+                 handleGenerateSingle(
+                  item.regNum,
+                  item.name,
+                  item._id,
+                  true
+                 )
+                }
+               >
+                Re-Print
+               </Button>
+              )}
+
+             </div>
 
             </div>
 

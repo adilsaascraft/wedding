@@ -64,7 +64,7 @@ export default function LoginPage() {
         { email: string; password: string },
         LoginResponse
       >({
-        endpoint: '/api/users/login',
+        endpoint: '/api/user-auth/login',
         method: 'POST',
         body: data,
 

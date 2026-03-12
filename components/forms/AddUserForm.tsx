@@ -75,8 +75,8 @@ export default function AddUserForm({
         { data: UserValues & { _id: string } }
       >({
         endpoint: isEdit
-          ? `/api/users/${defaultValues!._id}`
-          : `/api/users/create`,
+          ? `/api/admin/users/${defaultValues!._id}`
+          : `/api/admin/users/create`,
         method: isEdit ? 'PUT' : 'POST',
         body: values,
         showToast: false,

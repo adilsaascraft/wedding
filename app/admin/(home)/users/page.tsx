@@ -38,7 +38,7 @@ export default function UsersPage() {
   /* ================= FETCH ================= */
 
   const { data, isLoading, mutate } = useSWR(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/users`,
+    `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`,
     fetcher
   )
 
@@ -79,7 +79,7 @@ export default function UsersPage() {
       await new Promise((r) => setTimeout(r, 1500))
 
       const res = await fetchClient(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/users/${deleteId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${deleteId}`,
         { method: 'DELETE' }
       )
 

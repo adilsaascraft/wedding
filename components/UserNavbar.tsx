@@ -51,7 +51,7 @@ export default function UserNavbar({ handleLogout }: MobileNavbarProps) {
     try {
 
       await apiRequest({
-        endpoint: '/api/users/logout',
+        endpoint: '/api/user-auth/logout',
         method: 'POST',
       })
 
@@ -77,20 +77,17 @@ export default function UserNavbar({ handleLogout }: MobileNavbarProps) {
   }
 
   return (
-    <div className="sticky top-0 bg-white border-b border-orange-200 z-50">
+    <div className="sticky top-0 bg-white z-50">
 
       {/* MENU */}
-
-      <div className="flex justify-start md:justify-center gap-3 overflow-x-auto no-scrollbar px-4 py-2">
+      <div className="relative flex justify-start md:justify-center gap-3 overflow-x-auto no-scrollbar px-4 py-2">
 
         {navItems.map((item) => {
-
           const isActive =
             pathname === `/user${item.href}` ||
             pathname?.startsWith(`/user${item.href}/`)
 
           return (
-
             <Link
               key={item.name}
               href={`/user${item.href}`}
@@ -103,19 +100,21 @@ export default function UserNavbar({ handleLogout }: MobileNavbarProps) {
             >
               {item.name}
             </Link>
-
           )
         })}
 
-      </div>
-
-      {/* LOGOUT */}
-
-      <div className="flex justify-end px-4 pb-2">
-
+        {/* Mobile Logout */}
         <button
           onClick={() => setOpen(true)}
-          className="px-4 py-2 text-orange-700 font-semibold rounded-md hover:bg-orange-100 transition-colors"
+          className="md:hidden px-4 py-2 text-orange-700 font-semibold rounded-md hover:bg-orange-100 transition-colors"
+        >
+          Logout
+        </button>
+
+        {/* Tablet/Laptop Logout (top right) */}
+        <button
+          onClick={() => setOpen(true)}
+          className="hidden md:block absolute right-4 px-4 py-2 text-orange-700 font-semibold rounded-md hover:bg-orange-100 transition-colors"
         >
           Logout
         </button>
