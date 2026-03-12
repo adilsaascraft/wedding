@@ -1,22 +1,26 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
 import useSWR from 'swr'
 import { Html5Qrcode } from 'html5-qrcode'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import {
+ Select,
+ SelectContent,
+ SelectItem,
+ SelectTrigger,
+ SelectValue,
+} from "@/components/ui/select"
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
-type ScanDay = 'day1' | 'day2'
+import { fetchClient } from '@/lib/fetchClient'
+import { apiRequest } from '@/lib/apiRequest'
 
-const DAY_API: Record<ScanDay, string> = {
- day1: '/api/registers/day1',
- day2: '/api/registers/day2',
+type Module = {
+ _id: string
+ moduleName: string
 }
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type ScanResult =
  | {
@@ -35,23 +39,29 @@ type ScanResult =
 
 
 export default function QrScanner() {
+
  const scannerRef = useRef<Html5Qrcode | null>(null)
 
- const [activeDay, setActiveDay] = useState<ScanDay | null>(null)
+ const [selectedModule, setSelectedModule] = useState<string | null>(null)
  const [isScanning, setIsScanning] = useState(false)
  const [result, setResult] = useState<ScanResult>(null)
 
  // ==========================
- // Live Count (SWR)
+ // Fetch Modules (Protected GET)
  // ==========================
- const { data, mutate } = useSWR(
-  activeDay
-   ? `${process.env.NEXT_PUBLIC_API_URL}${DAY_API[activeDay]}`
-   : null,
-  fetcher,
+ const fetchModules = async () => {
+  const res = await fetchClient(
+   `${process.env.NEXT_PUBLIC_API_URL}/api/modules/active`
+  )
+  return res.json()
+ }
+
+ const { data: moduleResponse } = useSWR<{ data: Module[] }>(
+  'modules-active',
+  fetchModules
  )
 
- const count = data?.count ?? 0
+ const modules: Module[] = moduleResponse?.data || []
 
  // ==========================
  // Professional Beep
@@ -77,7 +87,6 @@ export default function QrScanner() {
     await scannerRef.current.stop()
     await scannerRef.current.clear()
    } catch {
-    // ignore errors
    } finally {
     scannerRef.current = null
     setIsScanning(false)
@@ -85,17 +94,29 @@ export default function QrScanner() {
   }
  }
 
+ // ==========================
+ // Handle Module Change
+ // ==========================
+ const handleModuleChange = async (value: string) => {
+
+  await stopScanner()
+
+  setSelectedModule(value)
+  setResult(null)
+  setIsScanning(false)
+
+ }
 
  // ==========================
- // Start Scan (SINGLE)
+ // Start Scan
  // ==========================
  const startScan = async () => {
-  if (!activeDay) {
-   toast.error('Please select a day before scanning')
+
+  if (!selectedModule) {
+   toast.error('Please select module before scanning')
    return
   }
 
-  // If already scanning, prevent duplicate
   if (isScanning) return
 
   setResult(null)
@@ -104,6 +125,7 @@ export default function QrScanner() {
   scannerRef.current = scanner
 
   try {
+
    await scanner.start(
     { facingMode: 'environment' },
     { fps: 10, qrbox: { width: 260, height: 260 } },
@@ -113,48 +135,48 @@ export default function QrScanner() {
      await markDelivered(decodedText)
     },
 
-    () => { },
+    () => {}
    )
 
    setIsScanning(true)
+
   } catch {
    toast.error('Camera permission denied')
   }
  }
 
  // ==========================
- // API Call
+ // POST /api/scans (Protected)
  // ==========================
  const markDelivered = async (regNum: string) => {
-  try {
-   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}${DAY_API[activeDay!]}`,
-    {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({ regNum }),
-    },
-   )
 
-   const data = await res.json()
-   if (!res.ok) throw new Error(data.message)
+  try {
+
+   const res = await apiRequest({
+    endpoint: `/api/scans`,
+    method: 'POST',
+    body: {
+     regNum,
+     moduleId: selectedModule
+    }
+   })
 
    playBeep('success')
    navigator.vibrate?.(120)
 
    setResult({
     type: 'success',
-    message: data.message,
-    name: data.data.name,
-    mobile: data.data.mobile,
-    note: data.data.note,
-    regNum: data.data.regNum,
+    message: res.message,
+    name: res.data.name,
+    mobile: res.data.mobile,
+    note: res.data.note,
+    regNum: res.data.regNum,
    })
 
-   mutate()
   } catch (err: any) {
+
    playBeep('error')
-   navigator.vibrate?.([80, 40, 80])
+   navigator.vibrate?.([80,40,80])
 
    setResult({
     type: 'error',
@@ -163,18 +185,6 @@ export default function QrScanner() {
   }
  }
 
- useEffect(() => {
-  if (!activeDay) return
-
-  // When day changes → stop previous scanner
-  stopScanner()
-
-  // Clear previous result
-  setResult(null)
-
- }, [activeDay])
-
-
  // Cleanup
  useEffect(() => {
   return () => {
@@ -182,38 +192,43 @@ export default function QrScanner() {
   }
  }, [])
 
-
  return (
-  <div className="space-y-6">
+  <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 p-4">
 
-   {/* ---------------- DAY SELECT ---------------- */}
-   <div className="flex justify-center gap-3">
-    {(['day1', 'day2'] as ScanDay[]).map((day) => {
-     const isActive = activeDay === day
+   {/* ---------------- MODULE SELECT ---------------- */}
+   <div className="max-w-sm mx-auto p-4">
 
-     return (
-      <Button
-       key={day}
-       variant={isActive ? 'default' : 'outline'}
-       onClick={() => setActiveDay(day)}
-       className={
-        isActive
-         ? 'bg-sky-800 hover:bg-sky-900 text-white'
-         : 'bg-gray-200 hover:bg-gray-300 text-gray-700 border-gray-300'
-       }
-      >
-       {day.toUpperCase()}
-       {isActive && (
-        <Badge className="ml-2" variant="secondary">
-         {count}
-        </Badge>
-       )}
-      </Button>
-     )
-    })}
+    <Select
+     value={selectedModule ?? ''}
+     onValueChange={handleModuleChange}
+    >
+
+     <SelectTrigger className='w-[340px] p-3'>
+      <SelectValue placeholder="Please select module" />
+     </SelectTrigger>
+
+     <SelectContent>
+
+      {modules.length === 0 && (
+       <SelectItem value="loading" disabled>
+        Loading modules...
+       </SelectItem>
+      )}
+
+      {modules.map((module)=>(
+       <SelectItem key={module._id} value={module._id}>
+        {module.moduleName}
+       </SelectItem>
+      ))}
+
+     </SelectContent>
+
+    </Select>
+
    </div>
 
-   {/* ---------------- RESULT OVERLAY ---------------- */}
+
+   {/* ---------------- RESULT ---------------- */}
    {result && (
     <div
      className={`mx-auto max-w-sm rounded-lg p-4 text-white space-y-2
@@ -223,13 +238,11 @@ export default function QrScanner() {
      <div className="flex items-center gap-2">
       {result.type === 'success' ? <CheckCircle2 /> : <XCircle />}
 
-      {/* Main Message */}
       <span className="font-bold text-base">
        {result.message}
       </span>
      </div>
 
-     {/* Show details only if success */}
      {result.type === 'success' && (
       <div className="mt-4 rounded-xl border bg-muted/40 p-4 space-y-3">
 
@@ -258,8 +271,6 @@ export default function QrScanner() {
     </div>
    )}
 
-
-
    {/* ---------------- SCANNER ---------------- */}
    <div className="mx-auto w-full max-w-sm">
     <div id="qr-reader" className="rounded-xl border overflow-hidden" />
@@ -267,10 +278,15 @@ export default function QrScanner() {
 
    {/* ---------------- ACTION ---------------- */}
    <div className="max-w-sm mx-auto">
-    <Button onClick={startScan} disabled={isScanning} className="w-full bg-sky-800 hover:bg-sky-900">
+    <Button
+     onClick={startScan}
+     disabled={isScanning}
+     className="w-[340px] bg-orange-600 hover:bg-orange-700"
+    >
      {isScanning ? 'Scanning…' : 'Start Scan'}
     </Button>
    </div>
+
   </div>
  )
 }
