@@ -273,7 +273,7 @@ export default function ZebraGateScanner() {
     <Button
      onClick={() => markAttendance(scanValue.trim())}
      disabled={processing}
-     className="w-full h-14 text-lg bg-sky-800 hover:bg-sky-900"
+     className="w-full h-14 text-lg bg-orange-600 hover:bg-orange-700"
     >
      {processing ? 'Submitting...' : 'Submit'}
     </Button>
