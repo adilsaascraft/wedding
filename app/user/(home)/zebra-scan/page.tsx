@@ -2,227 +2,245 @@
 
 import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
-import Image from 'next/image'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { CheckCircle2, XCircle } from 'lucide-react'
+import {
+ Select,
+ SelectContent,
+ SelectItem,
+ SelectTrigger,
+ SelectValue,
+} from '@/components/ui/select'
 
-type ScanDay = 'day1' | 'day2'
+import { fetchClient } from '@/lib/fetchClient'
+import { apiRequest } from '@/lib/apiRequest'
 
-const DAY_API: Record<ScanDay, string> = {
-  day1: '/api/registers/day1',
-  day2: '/api/registers/day2',
+type Module = {
+ _id: string
+ moduleName: string
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
-
 type ScanResult =
-  | {
-      type: 'success'
-      message: string
-      name: string
-      mobile: string
-      note: string
-      regNum: string
-    }
-  | {
-      type: 'error'
-      message: string
-    }
-  | null
+ | {
+     type: 'success'
+     message: string
+     name: string
+     mobile: string
+     note: string
+     regNum: string
+   }
+ | {
+     type: 'error'
+     message: string
+   }
+ | null
 
 export default function ZebraGateScanner() {
-  const inputRef = useRef<HTMLInputElement | null>(null)
+ const inputRef = useRef<HTMLInputElement | null>(null)
 
-  const [activeDay, setActiveDay] = useState<ScanDay | null>(null)
-  const [scanValue, setScanValue] = useState('')
-  const [processing, setProcessing] = useState(false)
-  const [result, setResult] = useState<ScanResult>(null)
+ const [selectedModule, setSelectedModule] = useState<string | null>(null)
+ const [scanValue, setScanValue] = useState('')
+ const [processing, setProcessing] = useState(false)
+ const [result, setResult] = useState<ScanResult>(null)
 
-  const { data, mutate } = useSWR(
-    activeDay
-      ? `${process.env.NEXT_PUBLIC_API_URL}${DAY_API[activeDay]}`
-      : null,
-    fetcher,
+ // ==========================
+ // Fetch Modules
+ // ==========================
+ const fetchModules = async () => {
+  const res = await fetchClient(
+   `${process.env.NEXT_PUBLIC_API_URL}/api/modules/active`
   )
+  return res.json()
+ }
 
-  const count = data?.count ?? 0
+ const { data } = useSWR<{ data: Module[] }>(
+  'modules-active',
+  fetchModules
+ )
 
-  // Keep input focused always
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [activeDay, result])
+ const modules: Module[] = data?.data || []
 
-const markAttendance = async (regNum: string) => {
-  if (!activeDay) {
-    toast.error('Please select a day first', { duration: 2000 })
-    return
+ // ==========================
+ // Always keep input focused
+ // ==========================
+ useEffect(() => {
+  inputRef.current?.focus()
+ }, [selectedModule, result])
+
+ // ==========================
+ // Handle Module Change
+ // ==========================
+ const handleModuleChange = (value: string) => {
+  setSelectedModule(value)
+  setResult(null)
+  setScanValue('')
+  inputRef.current?.focus()
+ }
+
+ // ==========================
+ // Scan Handler
+ // ==========================
+ const markAttendance = async (regNum: string) => {
+
+  if (!selectedModule) {
+   toast.error('Please select module first', { duration: 2000 })
+   return
   }
 
+  if (!regNum) return
   if (processing) return
 
   setProcessing(true)
-  setResult(null) // clear previous success panel
+  setResult(null)
 
   try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}${DAY_API[activeDay]}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ regNum }),
-      },
-    )
 
-    const json = await res.json()
-
-    // 🔥 Handle HTTP error
-    if (!res.ok) {
-      throw new Error(json?.message || 'Scan failed')
+   const res = await apiRequest({
+    endpoint: `/api/scans`,
+    method: 'POST',
+    body: {
+     regNum,
+     moduleId: selectedModule
     }
+   })
 
-    // 🔥 Handle success:false from backend
-    if (!json?.success) {
-      toast.error(json?.message || 'Scan failed', {
-        duration: 2000,
-      })
+   setResult({
+    type: 'success',
+    message: res.message || 'Success',
+    name: res.data?.name || '-',
+    mobile: res.data?.mobile || '-',
+    note: res.data?.note || '-',
+    regNum: res.data?.regNum || regNum,
+   })
 
-      setScanValue('') // clear input
-      inputRef.current?.focus()
-      return
-    }
+   setScanValue('')
 
-    // ✅ SUCCESS CASE
-    const attendee = json?.data || {}
-
-    setResult({
-      type: 'success',
-      message: json?.message || 'Success',
-      name: attendee?.name || '-',
-      mobile: attendee?.mobile || '-',
-      note: attendee?.note || '-',
-      regNum: attendee?.regNum || regNum,
-    })
-
-    mutate()
-    setScanValue('')
   } catch (err: any) {
-    toast.error(err?.message || 'Scan failed', {
-      duration: 2000,
-    })
 
-    setScanValue('')
+   setResult({
+    type: 'error',
+    message: err?.message || 'Scan failed',
+   })
+
+   setScanValue('')
   } finally {
-    setProcessing(false)
-    inputRef.current?.focus()
+   setProcessing(false)
+   inputRef.current?.focus()
   }
-}
+ }
 
-  const handleKeyDown = async (
-    e: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (e.key === 'Enter') {
-      const value = scanValue.trim()
-      if (!value) return
-      await markAttendance(value)
-    }
+ // ==========================
+ // ENTER key for Zebra scanner
+ // ==========================
+ const handleKeyDown = async (
+  e: React.KeyboardEvent<HTMLInputElement>,
+ ) => {
+  if (e.key === 'Enter') {
+   const value = scanValue.trim()
+   if (!value) return
+   await markAttendance(value)
   }
+ }
 
-  return (
-    <div className="min-h-screen flex flex-col items-center bg-background">
+ return (
+  <div className="min-h-screen flex flex-col items-center bg-background">
 
-     
+   {/* ---------------- MODULE SELECT ---------------- */}
+   <div className="max-w-sm mx-auto p-4">
 
-      {/* ---------------- DAY SELECT ---------------- */}
-      <div className="flex justify-center gap-3 m-4">
-        {(['day1', 'day2'] as ScanDay[]).map((day) => {
-          const isActive = activeDay === day
+    <Select
+     value={selectedModule ?? ''}
+     onValueChange={handleModuleChange}
+    >
 
-          return (
-            <Button
-              key={day}
-              variant={isActive ? 'default' : 'outline'}
-              onClick={() => setActiveDay(day)}
-              className={
-                isActive
-                  ? 'bg-sky-800 hover:bg-sky-900 text-white'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700 border-gray-300'
-              }
-            >
-              {day.toUpperCase()}
-              {isActive && (
-                <Badge className="ml-2" variant="secondary">
-                  {count}
-                </Badge>
-              )}
-            </Button>
-          )
-        })}
-      </div>
+     <SelectTrigger className="w-[340px] p-3">
+      <SelectValue placeholder="Please select module" />
+     </SelectTrigger>
 
-      {/* ---------------- RESULT PANEL ---------------- */}
-      {result && (
-        <div
-          className={`mx-auto w-full max-w-md rounded-xl p-4 text-white space-y-2 transition-all
-          ${result.type === 'success' ? 'bg-green-600' : 'bg-red-600'}
-        `}
-        >
-          <div className="flex items-center gap-2">
-            {result.type === 'success' ? <CheckCircle2 /> : <XCircle />}
-            <span className="font-bold text-base">
-              {result.message}
-            </span>
-          </div>
+     <SelectContent>
 
-          {result.type === 'success' && (
-            <div className="mt-4 rounded-xl bg-white/20 p-4 space-y-3 text-sm">
-
-              <div className="grid grid-cols-3 gap-2">
-                <span className="font-medium opacity-80">Reg No</span>
-                <span className="col-span-2 font-semibold">{result.regNum}</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <span className="font-medium opacity-80">Name</span>
-                <span className="col-span-2 font-semibold">{result.name}</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <span className="font-medium opacity-80">Mobile</span>
-                <span className="col-span-2 font-semibold">{result.mobile}</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <span className="font-medium opacity-80">Note</span>
-                <span className="col-span-2 font-semibold">{result.note}</span>
-              </div>
-
-            </div>
-          )}
-        </div>
+      {modules.length === 0 && (
+       <SelectItem value="loading" disabled>
+        Loading modules...
+       </SelectItem>
       )}
 
-      {/* ---------------- INPUT ---------------- */}
-      <div className="w-full max-w-xl space-y-4 p-4">
-        <input
-          ref={inputRef}
-          value={scanValue}
-          onChange={(e) => setScanValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Scanned Value..."
-          className="w-full h-20 text-2xl px-6 rounded-2xl border shadow-lg focus:ring-2 focus:ring-primary outline-none"
-          autoFocus
-        />
+      {modules.map((module) => (
+       <SelectItem key={module._id} value={module._id}>
+        {module.moduleName}
+       </SelectItem>
+      ))}
 
-        <Button
-          onClick={() => markAttendance(scanValue.trim())}
-          disabled={processing}
-          className="w-full h-14 text-lg bg-sky-800 hover:bg-sky-900"
-        >
-          {processing ? 'Submitting...' : 'Submit'}
-        </Button>
+     </SelectContent>
+
+    </Select>
+
+   </div>
+
+   {/* ---------------- RESULT PANEL ---------------- */}
+   {result && (
+    <div
+     className={`mx-auto w-full max-w-md rounded-xl p-4 text-white space-y-2 transition-all
+     ${result.type === 'success' ? 'bg-green-600' : 'bg-red-600'}
+    `}
+    >
+     <div className="flex items-center gap-2">
+      {result.type === 'success' ? <CheckCircle2 /> : <XCircle />}
+      <span className="font-bold text-base">{result.message}</span>
+     </div>
+
+     {result.type === 'success' && (
+      <div className="mt-4 rounded-xl bg-white/20 p-4 space-y-3 text-sm">
+
+       <div className="grid grid-cols-3 gap-2">
+        <span className="font-medium opacity-80">Reg No</span>
+        <span className="col-span-2 font-semibold">{result.regNum}</span>
+       </div>
+
+       <div className="grid grid-cols-3 gap-2">
+        <span className="font-medium opacity-80">Name</span>
+        <span className="col-span-2 font-semibold">{result.name}</span>
+       </div>
+
+       <div className="grid grid-cols-3 gap-2">
+        <span className="font-medium opacity-80">Mobile</span>
+        <span className="col-span-2 font-semibold">{result.mobile}</span>
+       </div>
+
+       <div className="grid grid-cols-3 gap-2">
+        <span className="font-medium opacity-80">Note</span>
+        <span className="col-span-2 font-semibold">{result.note}</span>
+       </div>
+
       </div>
+     )}
     </div>
-  )
+   )}
+
+   {/* ---------------- INPUT ---------------- */}
+   <div className="w-full max-w-xl space-y-4 p-4">
+
+    <input
+     ref={inputRef}
+     value={scanValue}
+     onChange={(e) => setScanValue(e.target.value)}
+     onKeyDown={handleKeyDown}
+     placeholder="Scanned Value..."
+     className="w-full h-20 text-2xl px-6 rounded-2xl border shadow-lg focus:ring-2 focus:ring-primary outline-none"
+     autoFocus
+    />
+
+    <Button
+     onClick={() => markAttendance(scanValue.trim())}
+     disabled={processing}
+     className="w-full h-14 text-lg bg-sky-800 hover:bg-sky-900"
+    >
+     {processing ? 'Submitting...' : 'Submit'}
+    </Button>
+
+   </div>
+
+  </div>
+ )
 }
