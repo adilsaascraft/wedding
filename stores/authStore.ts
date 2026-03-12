@@ -12,18 +12,29 @@ type User = {
 type AuthState = {
   user: User | null
   accessToken: string | null
-
+  hydrated: boolean
   setAuth: (user: User, token: string) => void
-  hydrate: () => void
   logout: () => void
+}
+
+const getInitialAuth = () => {
+  if (typeof window === 'undefined') {
+    return { user: null, accessToken: null }
+  }
+
+  const token = localStorage.getItem('accessToken')
+  const user = localStorage.getItem('user')
+
+  return {
+    accessToken: token,
+    user: user ? JSON.parse(user) : null
+  }
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
 
-  user: null,
-  accessToken: null,
-
-  /* ================= SET AUTH ================= */
+  ...getInitialAuth(),
+  hydrated: true,
 
   setAuth: (user, token) => {
 
@@ -36,26 +47,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     })
   },
 
-  /* ================= HYDRATE ================= */
-
-  hydrate: () => {
-
-    if (typeof window === 'undefined') return
-
-    const token = localStorage.getItem('accessToken')
-    const user = localStorage.getItem('user')
-
-    if (!token || !user) return
-
-    set({
-      accessToken: token,
-      user: JSON.parse(user)
-    })
-
-  },
-
-  /* ================= LOGOUT ================= */
-
   logout: () => {
 
     localStorage.removeItem('accessToken')
@@ -65,7 +56,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       user: null,
       accessToken: null
     })
-
   }
 
 }))

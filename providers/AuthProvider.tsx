@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from "react"
 import { useAuthStore } from "@/stores/authStore"
 
 export default function AuthProvider({
@@ -9,11 +8,12 @@ export default function AuthProvider({
   children: React.ReactNode
 }) {
 
-  const hydrate = useAuthStore((state) => state.hydrate)
+  const hydrated = useAuthStore((state) => state.hydrated)
 
-  useEffect(() => {
-    hydrate()
-  }, [hydrate])
+  /* prevent app rendering before auth loads */
+  if (!hydrated) {
+    return null
+  }
 
   return <>{children}</>
 }

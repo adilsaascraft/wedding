@@ -11,8 +11,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const user = useAuthStore((state) => state.user)
   const accessToken = useAuthStore((state) => state.accessToken)
+  const hydrated = useAuthStore((state) => state.hydrated)
 
   useEffect(() => {
+
+    if (!hydrated) return
 
     if (!accessToken) {
       router.replace('/admin/login')
@@ -23,20 +26,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace('/user/dashboard')
     }
 
-  }, [accessToken, user, router])
+  }, [hydrated, accessToken, user, router])
 
-  /* prevent flicker before auth loads */
-  if (!accessToken) return null
+  if (!hydrated) return null
 
   return (
     <div className="flex flex-col min-h-screen">
 
-      {/* Mobile Navbar */}
       <div className="block sticky top-0 z-50">
         <AdminNavbar />
       </div>
 
-      {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

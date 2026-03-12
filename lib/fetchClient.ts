@@ -14,8 +14,6 @@ export async function fetchClient(
 
   headers.set("Accept", "application/json");
 
-  /* avoid setting content-type for FormData */
-
   if (!(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
@@ -34,13 +32,19 @@ export async function fetchClient(
   if (response.status === 401) {
 
     if (typeof window !== "undefined") {
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("user");
 
-      window.location.href = "/";
+      const token = localStorage.getItem("accessToken");
+
+      /* logout ONLY if token does not exist */
+
+      if (!token) {
+        localStorage.removeItem("user");
+        window.location.href = "/";
+      }
+
     }
 
-    throw new Error("Session expired");
+    throw new Error("Unauthorized");
   }
 
   if (!response.ok) {
