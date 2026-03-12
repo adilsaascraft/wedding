@@ -231,7 +231,7 @@ export default function QrScanner() {
    {/* ---------------- RESULT ---------------- */}
    {result && (
     <div
-     className={`mx-auto max-w-sm rounded-lg p-4 text-white space-y-2
+     className={`w-full rounded-lg p-4 text-white space-y-2
       ${result.type === 'success' ? 'bg-green-600' : 'bg-red-600'}
     `}
     >
