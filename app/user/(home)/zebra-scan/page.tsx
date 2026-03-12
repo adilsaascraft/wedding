@@ -21,22 +21,19 @@ type Module = {
  moduleName: string
 }
 
-type ScanResult =
- | {
-     type: 'success'
-     message: string
-     name: string
-     mobile: string
-     note: string
-     regNum: string
-   }
- | {
-     type: 'error'
-     message: string
-   }
- | null
+type ScanResult = {
+ success: boolean
+ message: string
+ moduleName?: string
+ name?: string
+ mobile?: string
+ note?: string
+ regNum?: string
+ createdAt?: string
+} | null
 
 export default function ZebraGateScanner() {
+
  const inputRef = useRef<HTMLInputElement | null>(null)
 
  const [selectedModule, setSelectedModule] = useState<string | null>(null)
@@ -62,11 +59,26 @@ export default function ZebraGateScanner() {
  const modules: Module[] = data?.data || []
 
  // ==========================
- // Always keep input focused
+ // Keep input focused
  // ==========================
  useEffect(() => {
   inputRef.current?.focus()
  }, [selectedModule, result])
+
+ // ==========================
+ // Auto hide result card
+ // ==========================
+ useEffect(() => {
+
+  if (!result) return
+
+  const timer = setTimeout(() => {
+   setResult(null)
+  }, 3000)
+
+  return () => clearTimeout(timer)
+
+ }, [result])
 
  // ==========================
  // Handle Module Change
@@ -105,13 +117,17 @@ export default function ZebraGateScanner() {
     }
    })
 
+   const data = res?.data || {}
+
    setResult({
-    type: 'success',
-    message: res.message || 'Success',
-    name: res.data?.name || '-',
-    mobile: res.data?.mobile || '-',
-    note: res.data?.note || '-',
-    regNum: res.data?.regNum || regNum,
+    success: res.success,
+    message: res.message,
+    moduleName: data?.moduleId?.moduleName,
+    name: data?.registerId?.name,
+    mobile: data?.registerId?.mobile,
+    note: data?.registerId?.note,
+    regNum: data?.registerId?.regNum,
+    createdAt: data?.createdAt
    })
 
    setScanValue('')
@@ -119,8 +135,8 @@ export default function ZebraGateScanner() {
   } catch (err: any) {
 
    setResult({
-    type: 'error',
-    message: err?.message || 'Scan failed',
+    success: false,
+    message: err?.message || 'Scan failed'
    })
 
    setScanValue('')
@@ -131,7 +147,7 @@ export default function ZebraGateScanner() {
  }
 
  // ==========================
- // ENTER key for Zebra scanner
+ // ENTER key (Zebra scanner)
  // ==========================
  const handleKeyDown = async (
   e: React.KeyboardEvent<HTMLInputElement>,
@@ -178,43 +194,66 @@ export default function ZebraGateScanner() {
 
    </div>
 
-   {/* ---------------- RESULT PANEL ---------------- */}
+   {/* ---------------- RESULT CARD ---------------- */}
    {result && (
     <div
-     className={`mx-auto w-full max-w-md rounded-xl p-4 text-white space-y-2 transition-all
-     ${result.type === 'success' ? 'bg-green-600' : 'bg-red-600'}
+     className={`relative mx-auto w-full max-w-md rounded-xl p-4 text-white space-y-3
+     ${result.success ? 'bg-green-600' : 'bg-red-600'}
     `}
     >
+
+     {/* Close button */}
+     <button
+      onClick={() => setResult(null)}
+      className="absolute top-2 right-2 text-white text-lg"
+     >
+      ✕
+     </button>
+
      <div className="flex items-center gap-2">
-      {result.type === 'success' ? <CheckCircle2 /> : <XCircle />}
-      <span className="font-bold text-base">{result.message}</span>
+      {result.success ? <CheckCircle2 /> : <XCircle />}
+      <span className="font-bold text-lg">{result.message}</span>
      </div>
 
-     {result.type === 'success' && (
-      <div className="mt-4 rounded-xl bg-white/20 p-4 space-y-3 text-sm">
-
-       <div className="grid grid-cols-3 gap-2">
-        <span className="font-medium opacity-80">Reg No</span>
-        <span className="col-span-2 font-semibold">{result.regNum}</span>
-       </div>
-
-       <div className="grid grid-cols-3 gap-2">
-        <span className="font-medium opacity-80">Name</span>
-        <span className="col-span-2 font-semibold">{result.name}</span>
-       </div>
-
-       <div className="grid grid-cols-3 gap-2">
-        <span className="font-medium opacity-80">Mobile</span>
-        <span className="col-span-2 font-semibold">{result.mobile}</span>
-       </div>
-
-       <div className="grid grid-cols-3 gap-2">
-        <span className="font-medium opacity-80">Note</span>
-        <span className="col-span-2 font-semibold">{result.note}</span>
-       </div>
-
+     {result.moduleName && (
+      <div className="text-sm font-semibold">
+       Module: {result.moduleName}
       </div>
      )}
+
+     <div className="rounded-xl bg-white/20 p-4 space-y-2 text-sm">
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Reg No</span>
+       <span className="col-span-2 font-semibold">{result.regNum}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Name</span>
+       <span className="col-span-2 font-semibold">{result.name}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Mobile</span>
+       <span className="col-span-2 font-semibold">{result.mobile}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Note</span>
+       <span className="col-span-2 font-semibold">{result.note}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Scanned At</span>
+       <span className="col-span-2 font-semibold">
+        {result.createdAt
+         ? new Date(result.createdAt).toLocaleString()
+         : '-'}
+       </span>
+      </div>
+
+     </div>
+
     </div>
    )}
 

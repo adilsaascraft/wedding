@@ -22,20 +22,16 @@ type Module = {
  moduleName: string
 }
 
-type ScanResult =
- | {
-  type: 'success'
-  message: string
-  name: string
-  mobile: string
-  note: string
-  regNum: string
- }
- | {
-  type: 'error'
-  message: string
- }
- | null
+type ScanResult = {
+ success: boolean
+ message: string
+ moduleName?: string
+ name?: string
+ mobile?: string
+ note?: string
+ regNum?: string
+ createdAt?: string
+} | null
 
 
 export default function QrScanner() {
@@ -47,7 +43,7 @@ export default function QrScanner() {
  const [result, setResult] = useState<ScanResult>(null)
 
  // ==========================
- // Fetch Modules (Protected GET)
+ // Fetch Modules
  // ==========================
  const fetchModules = async () => {
   const res = await fetchClient(
@@ -146,7 +142,7 @@ export default function QrScanner() {
  }
 
  // ==========================
- // POST /api/scans (Protected)
+ // POST /api/scans
  // ==========================
  const markDelivered = async (regNum: string) => {
 
@@ -161,16 +157,20 @@ export default function QrScanner() {
     }
    })
 
-   playBeep('success')
+   const data = res?.data || {}
+
+   playBeep(res.success ? 'success' : 'error')
    navigator.vibrate?.(120)
 
    setResult({
-    type: 'success',
+    success: res.success,
     message: res.message,
-    name: res.data.name,
-    mobile: res.data.mobile,
-    note: res.data.note,
-    regNum: res.data.regNum,
+    moduleName: data?.moduleId?.moduleName,
+    name: data?.registerId?.name,
+    mobile: data?.registerId?.mobile,
+    note: data?.registerId?.note,
+    regNum: data?.registerId?.regNum,
+    createdAt: data?.createdAt
    })
 
   } catch (err: any) {
@@ -179,11 +179,26 @@ export default function QrScanner() {
    navigator.vibrate?.([80,40,80])
 
    setResult({
-    type: 'error',
-    message: err.message || 'Scan failed',
+    success: false,
+    message: err.message || 'Scan failed'
    })
   }
  }
+
+ // ==========================
+ // Auto hide result card
+ // ==========================
+ useEffect(() => {
+
+  if (!result) return
+
+  const timer = setTimeout(() => {
+   setResult(null)
+  }, 3000)
+
+  return () => clearTimeout(timer)
+
+ }, [result])
 
  // Cleanup
  useEffect(() => {
@@ -228,46 +243,71 @@ export default function QrScanner() {
    </div>
 
 
-   {/* ---------------- RESULT ---------------- */}
+   {/* ---------------- RESULT CARD ---------------- */}
    {result && (
     <div
-     className={`w-full rounded-lg p-4 text-white space-y-2
-      ${result.type === 'success' ? 'bg-green-600' : 'bg-red-600'}
+     className={`relative w-full rounded-lg p-4 text-white space-y-3
+      ${result.success ? 'bg-green-600' : 'bg-red-600'}
     `}
     >
-     <div className="flex items-center gap-2">
-      {result.type === 'success' ? <CheckCircle2 /> : <XCircle />}
 
-      <span className="font-bold text-base">
+     {/* Close button */}
+     <button
+      onClick={() => setResult(null)}
+      className="absolute top-2 right-2 text-white text-lg"
+     >
+      ✕
+     </button>
+
+     {/* Message */}
+     <div className="flex items-center gap-2">
+      {result.success ? <CheckCircle2 /> : <XCircle />}
+      <span className="font-bold text-lg">
        {result.message}
       </span>
      </div>
 
-     {result.type === 'success' && (
-      <div className="mt-4 rounded-xl border bg-muted/40 p-4 space-y-3">
-
-       <div className="grid grid-cols-3 gap-2 text-sm">
-        <span className="font-medium text-muted-foreground">Reg No</span>
-        <span className="col-span-2 font-semibold">{result.regNum}</span>
-       </div>
-
-       <div className="grid grid-cols-3 gap-2 text-sm">
-        <span className="font-medium text-muted-foreground">Name</span>
-        <span className="col-span-2 font-semibold">{result.name}</span>
-       </div>
-
-       <div className="grid grid-cols-3 gap-2 text-sm">
-        <span className="font-medium text-muted-foreground">Mobile</span>
-        <span className="col-span-2 font-semibold">{result.mobile}</span>
-       </div>
-
-       <div className="grid grid-cols-3 gap-2 text-sm">
-        <span className="font-medium text-muted-foreground">Note</span>
-        <span className="col-span-2 font-semibold">{result.note}</span>
-       </div>
-
+     {/* Module */}
+     {result.moduleName && (
+      <div className="font-semibold text-sm">
+       Module: {result.moduleName}
       </div>
      )}
+
+     {/* Details */}
+     <div className="rounded-xl bg-white/20 p-4 space-y-2 text-sm">
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Reg No</span>
+       <span className="col-span-2 font-semibold">{result.regNum}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Name</span>
+       <span className="col-span-2 font-semibold">{result.name}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Mobile</span>
+       <span className="col-span-2 font-semibold">{result.mobile}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Note</span>
+       <span className="col-span-2 font-semibold">{result.note}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+       <span>Scanned At</span>
+       <span className="col-span-2 font-semibold">
+        {result.createdAt
+         ? new Date(result.createdAt).toLocaleString()
+         : '-'}
+       </span>
+      </div>
+
+     </div>
+
     </div>
    )}
 
