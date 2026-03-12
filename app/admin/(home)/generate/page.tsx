@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, ArrowLeft, Download} from "lucide-react";
+import { Loader2, ArrowLeft, Download } from "lucide-react";
 import QRCode from "qrcode";
 
+export const dynamic = "force-dynamic";
+
 export default function GenerateFlyerPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">Loading...</div>}>
+      <GenerateFlyerContent />
+    </Suspense>
+  );
+}
+
+function GenerateFlyerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -18,7 +28,11 @@ export default function GenerateFlyerPage() {
   const [frameImage, setFrameImage] = useState<HTMLImageElement | null>(null);
   const [qrImage, setQrImage] = useState<string>("");
   const [compositeImage, setCompositeImage] = useState<string>("");
-  const computedFont = getComputedStyle(document.body).fontFamily;
+  const [computedFont, setComputedFont] = useState("");
+
+  useEffect(() => {
+    setComputedFont(getComputedStyle(document.body).fontFamily);
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -33,7 +47,6 @@ export default function GenerateFlyerPage() {
       setQrCodeData(code);
       setName(decodeURIComponent(personName));
 
-      // 🔥 Ensure Cinzel font is loaded before drawing
       await document.fonts.load('bold 40px "Cinzel"');
 
       await Promise.all([loadFrameImage(), generateQRCode(code)]);
@@ -47,7 +60,7 @@ export default function GenerateFlyerPage() {
     return new Promise((resolve) => {
       const img = new window.Image();
       img.crossOrigin = "anonymous";
-      img.src = "/frame.jpeg"; // Make sure this matches your filename
+      img.src = "/frame.jpeg";
       img.onload = () => {
         setFrameImage(img);
         resolve();
@@ -71,7 +84,6 @@ export default function GenerateFlyerPage() {
     }
   };
 
-  // Create composite image when all assets are loaded
   useEffect(() => {
     if (!loading && frameImage && qrImage && canvasRef.current) {
       createCompositeImage();
@@ -82,45 +94,36 @@ export default function GenerateFlyerPage() {
     const canvas = canvasRef.current;
     if (!canvas || !frameImage || !qrImage) return;
 
-    // Set canvas dimensions to match frame
     canvas.width = frameImage.width;
     canvas.height = frameImage.height;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Draw frame first
     ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
 
-    // Draw name
     ctx.font = `bold 20px ${computedFont}`;
     ctx.fillStyle = "#504943";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // Position name - adjust these coordinates based on your frame
-    const nameX = canvas.width / 2; // Center horizontally
-    const nameY = canvas.height * 0.57; // 47% from top (adjust as needed)
+    const nameX = canvas.width / 2;
+    const nameY = canvas.height * 0.57;
 
     ctx.fillText(name.toUpperCase(), nameX, nameY);
 
-    // Load and draw QR code
     const qrImg = new window.Image();
     qrImg.crossOrigin = "anonymous";
     qrImg.onload = () => {
-      // Position QR - adjust these coordinates based on your frame
-      const qrSize = 104; // Size of QR code
-      const qrX = (canvas.width - qrSize) / 2; // Center horizontally
-      const qrY = canvas.height * 0.61; // 60% from top (adjust as needed)
+      const qrSize = 104;
+      const qrX = (canvas.width - qrSize) / 2;
+      const qrY = canvas.height * 0.61;
 
-      // Draw white background for QR
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10);
 
-      // Draw QR code
       ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-      // Convert canvas to data URL
       setCompositeImage(canvas.toDataURL("image/png"));
     };
     qrImg.src = qrImage;
@@ -130,7 +133,7 @@ export default function GenerateFlyerPage() {
     if (!compositeImage) return;
 
     const link = document.createElement("a");
-    link.download = `${name.replace(/\s+/g, '_')}-wedding-invitation.png`;
+    link.download = `${name.replace(/\s+/g, "_")}-wedding-invitation.png`;
     link.href = compositeImage;
     link.click();
   };
@@ -194,10 +197,8 @@ export default function GenerateFlyerPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 p-4">
       <div className="max-w-4xl mx-auto py-8">
-        {/* Hidden canvas for image processing */}
         <canvas ref={canvasRef} style={{ display: "none" }} />
 
-        {/* Navigation */}
         <div className="flex justify-between items-center mb-6">
           <Button variant="ghost" onClick={() => router.push("/admin/search")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -205,7 +206,6 @@ export default function GenerateFlyerPage() {
           </Button>
         </div>
 
-        {/* Main Content */}
         <Card className="p-6 md:p-8 bg-white/95 backdrop-blur shadow-2xl">
           <div className="text-center mb-8">
             <h2 className="text-3xl md:text-4xl font-bold text-[#504943] mb-2 font-cinzel">
@@ -214,7 +214,6 @@ export default function GenerateFlyerPage() {
             <p className="text-gray-500 font-cinzel text-lg">{name}</p>
           </div>
 
-          {/* Composite Image Preview */}
           {compositeImage && (
             <div className="mb-8 flex justify-center">
               <div className="relative rounded-xl shadow-2xl overflow-hidden max-w-2xl">
@@ -227,7 +226,6 @@ export default function GenerateFlyerPage() {
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row justify-center gap-4 mb-6">
             <Button
               onClick={handleDownload}
@@ -246,7 +244,6 @@ export default function GenerateFlyerPage() {
             </Button>
           </div>
 
-          {/* QR Code Info */}
           <div className="text-center space-y-2">
             <p className="text-sm text-gray-500 bg-amber-50 inline-block px-4 py-2 rounded-full">
               <span className="font-semibold">QR Code contains:</span>{" "}
