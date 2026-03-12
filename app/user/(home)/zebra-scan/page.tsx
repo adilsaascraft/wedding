@@ -154,7 +154,7 @@ export default function ZebraGateScanner() {
      onValueChange={handleModuleChange}
     >
 
-     <SelectTrigger className="w-[340px] p-3">
+     <SelectTrigger className="w-[320px]">
       <SelectValue placeholder="Please select module" />
      </SelectTrigger>
 
