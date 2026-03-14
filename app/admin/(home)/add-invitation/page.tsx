@@ -102,7 +102,7 @@ export default function AddInvitationPage() {
 
   return (
 
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 p-4">
+    <div className="min-h-screen flex flex-col p-4">
 
       <div className="max-w-4xl mx-auto pt-16 flex-1 w-full">
 
