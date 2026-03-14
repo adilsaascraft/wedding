@@ -208,7 +208,7 @@ export default function QrScanner() {
  }, [])
 
  return (
-  <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 p-4">
+  <div className="min-h-screen flex flex-col p-4">
 
    {/* ---------------- MODULE SELECT ---------------- */}
    <div className="max-w-sm mx-auto p-4">
