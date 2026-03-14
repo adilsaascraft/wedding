@@ -1,62 +1,164 @@
-
 'use client'
-import { useRouter } from 'next/navigation'
+
+import useSWR from 'swr'
+import { useMemo } from 'react'
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Users, ScanLine, Clock, Printer, UserCheck } from 'lucide-react'
+
+import { fetcher } from '@/lib/fetcher'
 
 export default function AdminDashboardPage() {
-  const router = useRouter()
+  /* ================= REGISTERS ================= */
 
-  const handleLogout = () => {
-    // Example logout logic
-    console.log('Logging out...')
-    // Clear auth tokens, redirect to login page
-    router.push('/login')
-  }
+  const { data: registerRes } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/registers`,
+    fetcher,
+  )
+
+  const registers = useMemo(() => registerRes?.data ?? [], [registerRes])
+
+  const totalRegistrations = registerRes?.count ?? 0
+
+  const printedCount = useMemo(
+    () => registers.filter((r: any) => r.isPrinted).length,
+    [registers],
+  )
+
+  const pendingPrint = useMemo(
+    () => registers.filter((r: any) => !r.isPrinted).length,
+    [registers],
+  )
+
+  /* ================= SCANS ================= */
+
+  const { data: scanRes } = useSWR(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/scans`,
+    fetcher,
+  )
+
+  const scans = useMemo(() => scanRes?.data ?? [], [scanRes])
+
+  const totalScans = scanRes?.count ?? 0
+
+  const remainingScans = totalRegistrations - totalScans
+
+  const recentScans = scans.slice(0, 10)
+
+  /* ================= UI ================= */
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="space-y-6 p-6">
+      <h1 className="text-2xl font-bold">Admin Dashboard</h1>
 
-      {/* Main Content */}
-      <main className="flex-1 p-4 overflow-y-auto">
-        <div className="max-w-7xl mx-auto space-y-6">
+      {/* ================= STATS ================= */}
 
-          <h1 className="text-3xl font-semibold text-gray-800">
-            Admin Dashboard
-          </h1>
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+        <Card>
+          <CardHeader className="flex justify-between flex-row items-center">
+            <CardTitle>Total Registration</CardTitle>
+            <Users className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Example cards */}
-            <div className="p-4 bg-white rounded-lg shadow hover:shadow-lg transition">
-              <h2 className="font-semibold text-lg text-gray-700">Total Guest</h2>
-              <p className="mt-2 text-gray-500 text-sm">1234</p>
-            </div>
+          <CardContent>
+            <p className="text-3xl font-bold">{totalRegistrations}</p>
+          </CardContent>
+        </Card>
 
-            <div className="p-4 bg-white rounded-lg shadow hover:shadow-lg transition">
-              <h2 className="font-semibold text-lg text-gray-700">Scanned</h2>
-              <p className="mt-2 text-gray-500 text-sm">45</p>
-            </div>
+        <Card>
+          <CardHeader className="flex justify-between flex-row items-center">
+            <CardTitle>Total Scans</CardTitle>
+            <ScanLine className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
 
-            <div className="p-4 bg-white rounded-lg shadow hover:shadow-lg transition">
-              <h2 className="font-semibold text-lg text-gray-700">Not Scanned</h2>
-              <p className="mt-2 text-gray-500 text-sm">1180</p>
-            </div>
+          <CardContent>
+            <p className="text-3xl font-bold text-green-600">{totalScans}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex justify-between flex-row items-center">
+            <CardTitle>Remaining Scans</CardTitle>
+            <Clock className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-3xl font-bold text-orange-500">
+              {remainingScans}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex justify-between flex-row items-center">
+            <CardTitle>Badges Printed</CardTitle>
+            <Printer className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-3xl font-bold text-blue-600">{printedCount}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex justify-between flex-row items-center">
+            <CardTitle>Pending Print</CardTitle>
+            <UserCheck className="w-5 h-5 text-muted-foreground" />
+          </CardHeader>
+
+          <CardContent>
+            <p className="text-3xl font-bold text-red-500">{pendingPrint}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ================= RECENT SCANS ================= */}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Scans</CardTitle>
+        </CardHeader>
+
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-2">Name</th>
+                  <th>Reg No</th>
+                  <th>Module</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {recentScans.map((scan: any) => (
+                  <tr key={scan._id} className="border-b">
+                    <td className="py-2">{scan.registerId?.name}</td>
+
+                    <td>{scan.regNum}</td>
+
+                    <td>{scan.moduleId?.moduleName}</td>
+
+                    <td>{new Date(scan.createdAt).toLocaleTimeString()}</td>
+                  </tr>
+                ))}
+
+                {recentScans.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="text-center py-6 text-muted-foreground"
+                    >
+                      No scans yet
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-
-          {/* More content */}
-          <div className="p-4 bg-white rounded-lg shadow hover:shadow-lg transition">
-            <h2 className="font-semibold text-lg text-gray-700">Announcements</h2>
-            <ul className="mt-2 list-disc list-inside text-gray-500 text-sm">
-              <li>System maintenance on 15th March</li>
-              <li>New data added</li>
-              <li>scan schedule updated</li>
-            </ul>
-          </div>
-
-        </div>
-      </main>
+        </CardContent>
+      </Card>
     </div>
   )
 }
-
-
-
-

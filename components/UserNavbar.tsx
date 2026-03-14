@@ -25,9 +25,9 @@ type MobileNavbarProps = {
 
 const menuItems = [
   { name: 'Dashboard', href: '/dashboard' },
-  { name: 'Badge Printing', href: '/search' },
   { name: 'Mobile Scan', href: '/mobile-scan' },
   { name: 'Zebra Scan', href: '/zebra-scan' },
+  { name: 'Badge Printing', href: '/search' },
 ]
 
 export default function UserNavbar({ handleLogout }: MobileNavbarProps) {
